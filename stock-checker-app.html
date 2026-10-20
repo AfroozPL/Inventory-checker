@@ -1,0 +1,524 @@
+<title>Stockroom Checker</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=Figtree:wght@400;500;600&family=JetBrains+Mono:wght@500;700&display=swap">
+<style>
+  /* Layout: one-column phone app shell — header, scrolling screen, bottom tab bar; centred card on desktop */
+  :root {
+    --bg: #E9EDE8;
+    --shell: #F7F9F6;
+    --surface: #FFFFFF;
+    --ink: #1B231F;
+    --muted: #5C6962;
+    --line: #D3DBD5;
+    --accent: #F2C230;      /* shelf-edge tag yellow */
+    --accent-ink: #1B231F;
+    --ok: #23865A;
+    --ok-soft: #DDF1E6;
+    --low: #B7780A;
+    --low-soft: #FBEFD3;
+    --out: #C13F2C;
+    --out-soft: #FADFDA;
+    --cell-empty: #E2E8E3;
+    --shadow: 0 1px 2px rgb(27 35 31 / .06), 0 8px 24px rgb(27 35 31 / .08);
+    --display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+    --body: "Figtree", "Segoe UI", system-ui, sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0E1210; --shell: #141917; --surface: #1C2320; --ink: #E5ECE7; --muted: #95A39B;
+      --line: #2B3430; --accent: #F2C230; --accent-ink: #1B231F;
+      --ok: #4CC38A; --ok-soft: #173327; --low: #E8B23A; --low-soft: #3A2E12; --out: #F0705C; --out-soft: #3D1D18;
+      --cell-empty: #2A322E; --shadow: 0 1px 2px rgb(0 0 0 / .4), 0 8px 24px rgb(0 0 0 / .35);
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0E1210; --shell: #141917; --surface: #1C2320; --ink: #E5ECE7; --muted: #95A39B;
+    --line: #2B3430; --accent: #F2C230; --accent-ink: #1B231F;
+    --ok: #4CC38A; --ok-soft: #173327; --low: #E8B23A; --low-soft: #3A2E12; --out: #F0705C; --out-soft: #3D1D18;
+    --cell-empty: #2A322E; --shadow: 0 1px 2px rgb(0 0 0 / .4), 0 8px 24px rgb(0 0 0 / .35);
+    color-scheme: dark;
+  }
+
+  html, body { height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: 15px;
+    line-height: 1.45;
+    display: flex;
+    justify-content: center;
+  }
+  * { box-sizing: border-box; }
+  button, input { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .app {
+    width: 100%;
+    max-width: 440px;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    background: var(--shell);
+    overflow: hidden;
+  }
+  @media (min-width: 520px) {
+    body { padding-block: 24px; }
+    .app { height: min(100%, 860px); border-radius: 28px; box-shadow: var(--shadow); border: 1px solid var(--line); }
+  }
+
+  .gutter {
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+  }
+
+  /* ---------- Header ---------- */
+  header.top {
+    padding-block: 18px 14px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    border-bottom: 1px solid var(--line);
+  }
+  .brand { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .brand small {
+    font-family: var(--mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted);
+  }
+  .brand h1 {
+    margin: 0; font-family: var(--display); font-weight: 800; font-size: 24px; line-height: 1.05; letter-spacing: -.01em;
+  }
+  .counter {
+    flex: none;
+    display: flex; flex-direction: column; align-items: center;
+    background: var(--accent); color: var(--accent-ink);
+    border-radius: 6px 6px 6px 6px;
+    padding: 6px 12px 5px;
+    clip-path: polygon(0 0, 100% 0, 100% 100%, 12px 100%, 0 calc(100% - 12px));
+  }
+  .counter b { font-family: var(--mono); font-size: 20px; line-height: 1; font-variant-numeric: tabular-nums; }
+  .counter span { font-size: 10px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
+
+  /* ---------- Screens ---------- */
+  main { flex: 1; overflow-y: auto; overscroll-behavior: contain; }
+  .screen { padding-block: 18px 28px; display: flex; flex-direction: column; gap: 18px; }
+
+  .search {
+    display: flex; gap: 8px;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 6px;
+  }
+  .search input {
+    flex: 1; min-width: 0; border: 0; background: transparent; padding: 10px 10px; font-size: 16px; outline: none;
+  }
+  .search input::placeholder { color: var(--muted); }
+  .search button {
+    border: 0; border-radius: 10px; padding: 0 18px; font-weight: 600;
+    background: var(--accent); color: var(--accent-ink);
+  }
+  .search button:active { transform: translateY(1px); }
+  .hint { margin: -8px 2px 0; font-size: 13px; color: var(--muted); }
+
+  .quick { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
+  .quick::-webkit-scrollbar { display: none; }
+  .quick button {
+    flex: none; display: flex; align-items: center; gap: 6px;
+    border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 6px 12px 6px 9px; font-size: 14px;
+  }
+  .quick button:hover { border-color: var(--muted); }
+
+  /* Result card */
+  .result {
+    background: var(--surface); border: 1px solid var(--line); border-radius: 18px; overflow: hidden;
+    box-shadow: var(--shadow);
+  }
+  .result.pop { animation: pop .28s ease-out; }
+  @keyframes pop { from { transform: scale(.97); } to { transform: none; } }
+  .result-head { display: flex; align-items: center; gap: 14px; padding: 18px 18px 14px; }
+  .result-icon {
+    flex: none; width: 60px; height: 60px; border-radius: 16px; display: grid; place-items: center; font-size: 34px;
+    background: var(--tint, var(--cell-empty));
+  }
+  .result-name { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+  .result-name h2 { margin: 0; font-family: var(--display); font-weight: 800; font-size: 26px; line-height: 1.05; }
+  .pill {
+    align-self: flex-start; display: inline-flex; align-items: center; gap: 6px;
+    font-size: 12px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase;
+    padding: 3px 9px; border-radius: 999px; color: var(--tone); background: var(--tint);
+  }
+  .pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+  .tone-ok { --tone: var(--ok); --tint: var(--ok-soft); }
+  .tone-low { --tone: var(--low); --tint: var(--low-soft); }
+  .tone-out { --tone: var(--out); --tint: var(--out-soft); }
+  .tone-none { --tone: var(--muted); --tint: var(--cell-empty); }
+
+  .gauge { padding: 0 18px 4px; }
+  .cells { display: grid; grid-template-columns: repeat(var(--max), 1fr); gap: 3px; }
+  .cells i { height: 18px; border-radius: 3px; background: var(--cell-empty); }
+  .cells i.on { background: var(--tone); }
+  .result .cells i { height: 22px; }
+  .scale {
+    display: flex; justify-content: space-between; margin-top: 6px;
+    font-family: var(--mono); font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums;
+  }
+  .result-units { display: flex; align-items: baseline; gap: 8px; padding: 12px 18px 0; }
+  .result-units b { font-family: var(--mono); font-size: 34px; line-height: 1; font-variant-numeric: tabular-nums; color: var(--tone); }
+  .result-units span { color: var(--muted); }
+  .result-msg { margin: 0; padding: 12px 18px 18px; font-weight: 500; }
+
+  .notfound { padding: 18px; display: flex; flex-direction: column; gap: 10px; }
+  .notfound h2 { margin: 0; font-family: var(--display); font-size: 21px; font-weight: 800; }
+  .notfound p { margin: 0; color: var(--muted); }
+  .notfound .quick { flex-wrap: wrap; overflow: visible; }
+
+  .section-label {
+    margin: 0; font-family: var(--mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted);
+  }
+
+  /* Summary */
+  .summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .summary button {
+    text-align: left; border: 1px solid var(--line); background: var(--surface); border-radius: 14px; padding: 10px 12px;
+    display: flex; flex-direction: column; gap: 2px;
+  }
+  .summary button b { font-family: var(--mono); font-size: 22px; color: var(--tone); font-variant-numeric: tabular-nums; }
+  .summary button span { font-size: 12px; color: var(--muted); }
+  .summary button[aria-pressed="true"] { border-color: var(--tone); background: var(--tint); }
+
+  /* Shelf list */
+  .shelf { display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; overflow: hidden; }
+  .row {
+    display: grid; grid-template-columns: 36px 1fr auto; align-items: center; gap: 4px 12px;
+    padding: 12px 14px; border: 0; border-bottom: 1px solid var(--line); background: transparent; text-align: left; width: 100%;
+  }
+  .row:last-child { border-bottom: 0; }
+  .row:hover { background: var(--shell); }
+  .row .ico { font-size: 24px; grid-row: span 2; }
+  .row .nm { font-weight: 600; text-transform: capitalize; }
+  .row .qty { font-family: var(--mono); font-weight: 700; color: var(--tone); font-variant-numeric: tabular-nums; text-align: right; }
+  .row .cells { grid-column: 2 / 4; }
+  .row .cells i { height: 6px; border-radius: 2px; }
+  .filters { display: flex; gap: 8px; flex-wrap: wrap; }
+  .filters button {
+    border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 6px 12px; font-size: 14px;
+  }
+  .filters button[aria-pressed="true"] { background: var(--ink); color: var(--shell); border-color: var(--ink); }
+
+  /* History */
+  .log { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 0; list-style: none; }
+  .log li {
+    display: flex; align-items: center; gap: 12px; background: var(--surface); border: 1px solid var(--line);
+    border-radius: 12px; padding: 10px 12px;
+  }
+  .log .t { font-family: var(--mono); font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .log .what { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+  .empty { text-align: center; color: var(--muted); padding: 32px 12px; border: 1px dashed var(--line); border-radius: 14px; }
+  .ghost {
+    align-self: center; border: 1px solid var(--line); background: transparent; border-radius: 999px; padding: 8px 16px; font-weight: 600;
+  }
+  .goodbye {
+    background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 16px; display: flex; flex-direction: column; gap: 4px;
+  }
+  .goodbye b { font-family: var(--display); font-size: 19px; }
+  .goodbye span { color: var(--muted); }
+
+  .legend { display: flex; flex-direction: column; gap: 6px; font-size: 14px; }
+  .legend div { display: flex; align-items: center; gap: 10px; }
+  .legend .pill { min-width: 112px; }
+
+  /* ---------- Tab bar ---------- */
+  nav.tabs {
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    border-top: 1px solid var(--line); background: var(--surface);
+    padding-top: 6px;
+    padding-bottom: max(8px, env(safe-area-inset-bottom, 0px));
+  }
+  nav.tabs button {
+    border: 0; background: transparent; display: flex; flex-direction: column; align-items: center; gap: 3px;
+    padding: 6px 4px; font-size: 12px; font-weight: 600; color: var(--muted); position: relative;
+  }
+  nav.tabs svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  nav.tabs button[aria-selected="true"] { color: var(--ink); }
+  nav.tabs button[aria-selected="true"]::before {
+    content: ""; position: absolute; top: -7px; left: 30%; right: 30%; height: 3px; border-radius: 0 0 3px 3px; background: var(--accent);
+  }
+  .badge {
+    position: absolute; top: 2px; left: calc(50% + 6px); min-width: 17px; height: 17px; padding: 0 4px; border-radius: 999px;
+    background: var(--accent); color: var(--accent-ink); font-family: var(--mono); font-size: 10px; line-height: 17px; text-align: center;
+  }
+
+  @media (prefers-reduced-motion: reduce) { .result.pop { animation: none; } }
+</style>
+
+<div class="app">
+  <header class="top gutter">
+    <div class="brand">
+      <small>Stockroom · 16 lines</small>
+      <h1>Stock Checker</h1>
+    </div>
+    <div class="counter" title="Products checked this session">
+      <b id="checkCount">0</b><span>checked</span>
+    </div>
+  </header>
+
+  <main id="main">
+    <!-- Check -->
+    <section class="screen gutter" id="screen-check">
+      <form class="search" id="searchForm" autocomplete="off">
+        <input id="productInput" type="search" placeholder="Type a product, e.g. eggs" aria-label="Product name" list="productList">
+        <button type="submit">Check</button>
+      </form>
+      <datalist id="productList"></datalist>
+      <p class="hint">Capital letters don't matter. Tap a product below for a quick check.</p>
+      <div class="quick" id="quickPicks" aria-label="Quick picks"></div>
+      <div id="resultSlot" aria-live="polite"></div>
+      <p class="section-label">What the results mean</p>
+      <div class="legend" id="legend"></div>
+    </section>
+
+    <!-- Shelf -->
+    <section class="screen gutter" id="screen-shelf" hidden>
+      <div class="summary" id="summary"></div>
+      <div class="filters" id="sortBar">
+        <button type="button" data-sort="shelf" aria-pressed="true">Shelf order</button>
+        <button type="button" data-sort="low" aria-pressed="false">Lowest first</button>
+        <button type="button" data-sort="az" aria-pressed="false">A–Z</button>
+      </div>
+      <div class="shelf" id="shelf"></div>
+    </section>
+
+    <!-- History -->
+    <section class="screen gutter" id="screen-history" hidden>
+      <div class="goodbye" id="sessionCard"></div>
+      <p class="section-label">This session</p>
+      <ul class="log" id="log"></ul>
+      <button type="button" class="ghost" id="resetBtn" hidden>Start a new session</button>
+    </section>
+  </main>
+
+  <nav class="tabs gutter" role="tablist" aria-label="Screens">
+    <button type="button" role="tab" data-tab="check" aria-selected="true">
+      <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.5 4.5"/></svg>Check
+    </button>
+    <button type="button" role="tab" data-tab="shelf" aria-selected="false">
+      <svg viewBox="0 0 24 24"><path d="M3.5 6h17M3.5 12h17M3.5 18h17"/><path d="M6.5 6V3.5M11 12V9M16 18v-3"/></svg>Shelf
+    </button>
+    <button type="button" role="tab" data-tab="history" aria-selected="false">
+      <svg viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.4-5.7"/><path d="M4 4v3.5h3.5"/><path d="M12 8v4.5l3 1.8"/></svg>History
+      <span class="badge" id="historyBadge" hidden>0</span>
+    </button>
+  </nav>
+</div>
+
+<script>
+  // ---------- Inventory database (same as inventory_checker.py) ----------
+  const inventory = {
+    apple: 12, banana: 3, milk: 0, bread: 7, eggs: 4, cheese: 0, orange: 9, grapes: 2,
+    strawberry: 6, watermelon: 1, carrot: 11, tomato: 0, potato: 8, rice: 10, honey: 3, cookies: 5,
+  };
+  const icons = {
+    apple: "🍎", banana: "🍌", milk: "🥛", bread: "🍞", eggs: "🥚", cheese: "🧀", orange: "🍊", grapes: "🍇",
+    strawberry: "🍓", watermelon: "🍉", carrot: "🥕", tomato: "🍅", potato: "🥔", rice: "🍚", honey: "🍯", cookies: "🍪",
+  };
+  const LOW_STOCK_THRESHOLD = 5;
+  const BAR_LENGTH = Math.max(...Object.values(inventory));
+  const names = Object.keys(inventory);
+
+  const STATUS = {
+    ok:  { label: "In stock",     msg: "Plenty available, good news!" },
+    low: { label: "Low stock",    msg: "Better be quick, it's almost gone!" },
+    out: { label: "Out of stock", msg: "Sorry, we've run out. Check back soon!" },
+  };
+  function statusOf(stock) {
+    if (stock === 0) return "out";
+    if (stock < LOW_STOCK_THRESHOLD) return "low";
+    return "ok";
+  }
+  const title = s => s.charAt(0).toUpperCase() + s.slice(1);
+  const esc = s => s.replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+  function cells(stock) {
+    let html = `<div class="cells" style="--max:${BAR_LENGTH}" aria-hidden="true">`;
+    for (let i = 0; i < BAR_LENGTH; i++) html += `<i class="${i < stock ? "on" : ""}"></i>`;
+    return html + "</div>";
+  }
+
+  // Closest names for a typo like "egg" or "tomatoes"
+  function distance(a, b) {
+    const d = Array.from({ length: a.length + 1 }, (_, i) => [i]);
+    for (let j = 1; j <= b.length; j++) d[0][j] = j;
+    for (let i = 1; i <= a.length; i++)
+      for (let j = 1; j <= b.length; j++)
+        d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+    return d[a.length][b.length];
+  }
+  function suggestions(query) {
+    return names
+      .map(n => ({ n, score: n.includes(query) || query.includes(n) ? 0 : distance(query, n) }))
+      .filter(x => x.score <= Math.max(2, Math.floor(query.length / 3)))
+      .sort((a, b) => a.score - b.score)
+      .slice(0, 3)
+      .map(x => x.n);
+  }
+
+  // ---------- State ----------
+  let checks = 0;
+  let history = [];
+  let sortMode = "shelf";
+  let filter = null;
+
+  const $ = id => document.getElementById(id);
+  const input = $("productInput");
+
+  function quickButton(n) {
+    return `<button type="button" data-check="${n}"><span>${icons[n]}</span>${n}</button>`;
+  }
+
+  // ---------- Check ----------
+  function check(raw, { record = true } = {}) {
+    const product = raw.trim().toLowerCase();
+    const slot = $("resultSlot");
+
+    if (product === "") {
+      slot.innerHTML = `<div class="result notfound pop"><h2>Nothing typed yet</h2><p>Oops, you didn't type anything. Give it another go!</p></div>`;
+      return;
+    }
+
+    if (record) {
+      checks += 1;
+      history.unshift({ product, time: new Date(), found: product in inventory });
+      renderCounts();
+    }
+
+    if (!(product in inventory)) {
+      const near = suggestions(product);
+      slot.innerHTML = `
+        <div class="result notfound pop">
+          <h2>“${esc(product)}” isn't on our list</h2>
+          <p>${near.length ? "Did you mean one of these?" : "Try one of the products we stock:"}</p>
+          <div class="quick">${(near.length ? near : names.slice(0, 6)).map(quickButton).join("")}</div>
+        </div>`;
+      return;
+    }
+
+    const stock = inventory[product];
+    const s = statusOf(stock);
+    slot.innerHTML = `
+      <article class="result tone-${s} pop">
+        <div class="result-head">
+          <div class="result-icon">${icons[product]}</div>
+          <div class="result-name">
+            <h2>${title(product)}</h2>
+            <span class="pill">${STATUS[s].label}</span>
+          </div>
+        </div>
+        <div class="result-units"><b>${stock}</b><span>${stock === 1 ? "unit" : "units"} on the shelf</span></div>
+        <div class="gauge">${cells(stock)}<div class="scale"><span>0</span><span>low &lt; ${LOW_STOCK_THRESHOLD}</span><span>${BAR_LENGTH} max</span></div></div>
+        <p class="result-msg">${STATUS[s].msg}</p>
+      </article>`;
+  }
+
+  // ---------- Shelf ----------
+  function renderShelf() {
+    const counts = { ok: 0, low: 0, out: 0 };
+    names.forEach(n => counts[statusOf(inventory[n])]++);
+    $("summary").innerHTML = ["ok", "low", "out"].map(s => `
+      <button type="button" class="tone-${s}" data-filter="${s}" aria-pressed="${filter === s}">
+        <b>${counts[s]}</b><span>${STATUS[s].label}</span>
+      </button>`).join("");
+
+    let list = names.filter(n => !filter || statusOf(inventory[n]) === filter);
+    if (sortMode === "low") list = [...list].sort((a, b) => inventory[a] - inventory[b]);
+    if (sortMode === "az") list = [...list].sort();
+
+    $("shelf").innerHTML = list.map(n => {
+      const s = statusOf(inventory[n]);
+      return `
+        <button type="button" class="row tone-${s}" data-check="${n}" aria-label="Check ${n}">
+          <span class="ico">${icons[n]}</span>
+          <span class="nm">${n}</span>
+          <span class="qty">${inventory[n]}</span>
+          ${cells(inventory[n])}
+        </button>`;
+    }).join("");
+
+    document.querySelectorAll("#sortBar button").forEach(b => b.setAttribute("aria-pressed", b.dataset.sort === sortMode));
+  }
+
+  // ---------- History ----------
+  function renderCounts() {
+    $("checkCount").textContent = checks;
+    const badge = $("historyBadge");
+    badge.textContent = checks;
+    badge.hidden = checks === 0;
+  }
+  function renderHistory() {
+    $("sessionCard").innerHTML = checks
+      ? `<b>Thanks for stopping by!</b><span>You checked ${checks} product${checks === 1 ? "" : "s"} today. See you next time!</span>`
+      : `<b>No checks yet</b><span>Products you check will be listed here.</span>`;
+    $("log").innerHTML = history.length
+      ? history.map(h => {
+          const s = h.found ? statusOf(inventory[h.product]) : "none";
+          const label = h.found ? STATUS[s].label : "Not on list";
+          const t = h.time.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+          return `<li class="tone-${s}"><span>${h.found ? icons[h.product] : "?"}</span>
+                    <span class="what">${esc(title(h.product))}</span>
+                    <span class="pill">${label}</span><span class="t">${t}</span></li>`;
+        }).join("")
+      : `<li class="empty">Go to Check and look up a product to start your list.</li>`;
+    $("resetBtn").hidden = history.length === 0;
+  }
+
+  // ---------- Tabs ----------
+  function showTab(tab) {
+    document.querySelectorAll("nav.tabs button").forEach(b => b.setAttribute("aria-selected", b.dataset.tab === tab));
+    ["check", "shelf", "history"].forEach(t => { $("screen-" + t).hidden = t !== tab; });
+    if (tab === "shelf") renderShelf();
+    if (tab === "history") renderHistory();
+    $("main").scrollTop = 0;
+  }
+
+  // ---------- Wiring ----------
+  $("productList").innerHTML = names.map(n => `<option value="${n}"></option>`).join("");
+  $("quickPicks").innerHTML = names.map(quickButton).join("");
+  $("legend").innerHTML = `
+    <div class="tone-ok"><span class="pill">In stock</span>${LOW_STOCK_THRESHOLD} or more units</div>
+    <div class="tone-low"><span class="pill">Low stock</span>fewer than ${LOW_STOCK_THRESHOLD} units</div>
+    <div class="tone-out"><span class="pill">Out of stock</span>0 units</div>`;
+
+  $("searchForm").addEventListener("submit", e => {
+    e.preventDefault();
+    check(input.value);
+    input.select();
+  });
+
+  document.addEventListener("click", e => {
+    const pick = e.target.closest("[data-check]");
+    if (pick) {
+      input.value = pick.dataset.check;
+      showTab("check");
+      check(pick.dataset.check);
+      return;
+    }
+    const tab = e.target.closest("[data-tab]");
+    if (tab) return showTab(tab.dataset.tab);
+    const f = e.target.closest("[data-filter]");
+    if (f) { filter = filter === f.dataset.filter ? null : f.dataset.filter; return renderShelf(); }
+    const s = e.target.closest("[data-sort]");
+    if (s) { sortMode = s.dataset.sort; return renderShelf(); }
+  });
+
+  $("resetBtn").addEventListener("click", () => {
+    checks = 0; history = [];
+    renderCounts(); renderHistory();
+  });
+
+  // Open on an example result so the screen shows what the app does
+  input.value = "banana";
+  check("banana", { record: false });
+  renderCounts();
+</script>
